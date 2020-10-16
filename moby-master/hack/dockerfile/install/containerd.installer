@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+# containerd is also pinned in vendor.conf. When updating the binary
+# version you may also need to update the vendor version to pick up bug
+# fixes or new APIs.
+: "${CONTAINERD_COMMIT:=c623d1b36f09f8ef6536a057bd658b3aa8632828}" # v1.4.1
+
+install_containerd() (
+	echo "Install containerd version $CONTAINERD_COMMIT"
+	git clone https://github.com/containerd/containerd.git "$GOPATH/src/github.com/containerd/containerd"
+	cd "$GOPATH/src/github.com/containerd/containerd"
+	git checkout -q "$CONTAINERD_COMMIT"
+
+	export BUILDTAGS='netgo osusergo static_build'
+	export EXTRA_FLAGS=${GO_BUILDMODE}
+	export EXTRA_LDFLAGS='-extldflags "-fno-PIC -static"'
+
+	# Reset build flags to nothing if we want a dynbinary
+	if [ "$1" = "dynamic" ]; then
+		export BUILDTAGS=''
+		export EXTRA_FLAGS=''
+		export EXTRA_LDFLAGS=''
+	fi
+	make
+
+	install -D bin/containerd "${PREFIX}/containerd"
+	install -D bin/containerd-shim "${PREFIX}/containerd-shim"
+	install -D bin/containerd-shim-runc-v2 "${PREFIX}/containerd-shim-runc-v2"
+	install -D bin/ctr "${PREFIX}/ctr"
+)
